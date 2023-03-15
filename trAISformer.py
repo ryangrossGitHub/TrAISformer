@@ -123,7 +123,7 @@ if __name__ == "__main__":
     ## Evaluation
     # ===============================
     # Load the best model
-    model.load_state_dict(torch.load(cf.ckpt_path))
+    # model.load_state_dict(torch.load(cf.ckpt_path))
 
     v_ranges = torch.tensor([2, 3, 0, 0]).to(cf.device)
     v_roi_min = torch.tensor([model.lat_min, -7, 0, 0]).to(cf.device)
@@ -163,6 +163,10 @@ if __name__ == "__main__":
     pred_errors = min_errors.sum(dim=0) / m_masks.sum(dim=0)
     pred_errors = pred_errors.detach().cpu().numpy()
 
+    ## Convert km to nautical miles
+    conversion_factor = 0.539957
+    pred_errors = [i * conversion_factor for i in pred_errors]
+
     ## Plot
     # ===============================
     plt.figure(figsize=(9, 6), dpi=150)
@@ -192,5 +196,7 @@ if __name__ == "__main__":
     plt.ylim([0, 20])
     # plt.ylim([0,pred_errors.max()+0.5])
     plt.savefig(cf.savedir + "prediction_error.png")
+
+    plt.show()
 
     # Yeah, done!!!
