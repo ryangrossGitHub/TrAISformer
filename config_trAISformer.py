@@ -49,6 +49,7 @@ class Config():
         lon_size = 270
         sog_size = 30
         cog_size = 72
+        mid_size = 999
 
         # n_lat_embd = 256
         # n_lon_embd = 256
@@ -59,6 +60,7 @@ class Config():
         n_lon_embd = 8
         n_sog_embd = 4
         n_cog_embd = 4
+        n_mid_embd = 8
 
         lat_min = 55.5
         lat_max = 58.0
@@ -96,8 +98,8 @@ class Config():
     # n_layer = 8
     n_head = 1
     n_layer = 1
-    full_size = lat_size + lon_size + sog_size + cog_size
-    n_embd = n_lat_embd + n_lon_embd + n_sog_embd + n_cog_embd
+    full_size = lat_size + lon_size + sog_size + cog_size + mid_size
+    n_embd = n_lat_embd + n_lon_embd + n_sog_embd + n_cog_embd + n_mid_embd
     # base GPT config, params common to all GPT versions
     embd_pdrop = 0.1
     resid_pdrop = 0.1
@@ -120,8 +122,8 @@ class Config():
     filename = f"{dataset_name}" \
                + f"-{mode}-{sample_mode}-{top_k}-{r_vicinity}" \
                + f"-blur-{blur}-{blur_learnable}-{blur_n}-{blur_loss_w}" \
-               + f"-data_size-{lat_size}-{lon_size}-{sog_size}-{cog_size}" \
-               + f"-embd_size-{n_lat_embd}-{n_lon_embd}-{n_sog_embd}-{n_cog_embd}" \
+               + f"-data_size-{lat_size}-{lon_size}-{sog_size}-{cog_size}-{mid_size}" \
+               + f"-embd_size-{n_lat_embd}-{n_lon_embd}-{n_sog_embd}-{n_cog_embd}-{n_mid_embd}" \
                + f"-head-{n_head}-{n_layer}" \
                + f"-bs-{batch_size}" \
                + f"-lr-{learning_rate}" \
