@@ -22,6 +22,7 @@ References:
 import os
 import math
 import logging
+from datetime import datetime
 
 from tqdm import tqdm
 import numpy as np
@@ -33,7 +34,9 @@ from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data.dataloader import DataLoader
 from torch.nn import functional as F
 import utils
+import pickle
 
+from config_trAISformer import Config
 from trAISformer import TB_LOG
 
 logger = logging.getLogger(__name__)
@@ -297,22 +300,65 @@ class Trainer:
                            top_k=self.config.top_k)
 
             img_path = os.path.join(self.savedir, f'epoch_{epoch + 1:03d}.jpg')
+
+            cf = Config()
+            # =====================================================================
+            LAT_MIN, LAT_MAX, LON_MIN, LON_MAX = cf.lat_min, cf.lat_max, cf.lon_min, cf.lon_max
+
+            LAT_RANGE = LAT_MAX - LAT_MIN
+            LON_RANGE = LON_MAX - LON_MIN
+            SPEED_MAX = 30.0  # knots
+            DURATION_MAX = 24  # h
+
+            EPOCH = datetime(1970, 1, 1)
+            LAT, LON, SOG, COG, HEADING, ROT, NAV_STT, TIMESTAMP, MMSI = list(range(9))
+
             plt.figure(figsize=(9, 6), dpi=150)
-            cmap = plt.cm.get_cmap("jet")
+            # cmap = plt.cm.get_cmap('Blues')
             preds_np = preds.detach().cpu().numpy()
             inputs_np = seqs.detach().cpu().numpy()
+
+            l_pkl_filenames = [cf.trainset_name]
+            Data, aisdatasets, aisdls = {}, {}, {}
+            for phase, filename in zip(("train"), l_pkl_filenames):
+                datapath = os.path.join(cf.datadir, filename)
+                print(f"Loading {datapath}...")
+                with open(datapath, "rb") as f:
+                    Data = pickle.load(f)
+                    Vs = Data
+                    FIG_DPI = 150
+                    cmap = plt.cm.get_cmap('Blues')
+                    N = len(Vs)
+                    for d_i in range(N):
+                        c = cmap(float(d_i) / (N - 1))
+                        tmp = Vs[d_i]
+                        v_lat = tmp['traj'][:, 0] * LAT_RANGE + LAT_MIN
+                        v_lon = tmp['traj'][:, 1] * LON_RANGE + LON_MIN
+                        plt.plot(v_lon, v_lat, color=c, linewidth=0.8)
+
+            coastline_filename = "./data/ct_dma/dma_coastline_polygons.pkl"
+            with open(coastline_filename, 'rb') as f:
+                l_coastline_poly = pickle.load(f)
+                for point in l_coastline_poly:
+                    poly = np.array(point)
+                    plt.plot(poly[:, 1], poly[:, 0], color="k", linewidth=0.8)
+
+
             for idx in range(n_plots):
                 c = cmap(float(idx) / (n_plots))
                 try:
                     seqlen = seqlens[idx].item()
                 except:
                     continue
-                plt.plot(inputs_np[idx][:init_seqlen, 1], inputs_np[idx][:init_seqlen, 0], color=c)
-                plt.plot(inputs_np[idx][:init_seqlen, 1], inputs_np[idx][:init_seqlen, 0], "o", markersize=3, color=c)
-                plt.plot(inputs_np[idx][:seqlen, 1], inputs_np[idx][:seqlen, 0], linestyle="-.", color=c)
-                plt.plot(preds_np[idx][init_seqlen:, 1], preds_np[idx][init_seqlen:, 0], "x", markersize=4, color=c)
-            plt.xlim([-0.05, 1.05])
-            plt.ylim([-0.05, 1.05])
+                plt.plot(utils.scale_array(inputs_np[idx][:seqlen, 1], LON_MIN, LON_MAX),
+                         utils.scale_array(inputs_np[idx][:seqlen, 0], LAT_MIN, LAT_MAX), linestyle="-", color="r")
+                plt.plot(utils.scale_array(preds_np[idx][init_seqlen:, 1], LON_MIN, LON_MAX),
+                         utils.scale_array(preds_np[idx][init_seqlen:, 0], LAT_MIN, LAT_MAX), "--", markersize=4, color="g")
+            plt.xlim([LON_MIN, LON_MAX])
+            plt.ylim([LAT_MIN, LAT_MAX])
+            plt.xlabel("Longitude")
+            plt.ylabel("Latitude")
+            plt.tight_layout()
             plt.savefig(img_path, dpi=150)
             plt.close()
 

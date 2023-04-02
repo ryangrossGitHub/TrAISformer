@@ -97,3 +97,10 @@ def top_k_nearest_idx(att_logits, att_idxs, r_vicinity):
     out = att_logits.clone()
     out[idx_dists >= r_vicinity/2] = -float('Inf')
     return out
+
+def scale_array(values, min, max):
+    updated_list = []
+    for value in values:
+        scaled_value = (((value - 0) * (max - min)) / (1 - 0)) + min
+        updated_list.append(scaled_value)
+    return np.array(updated_list)

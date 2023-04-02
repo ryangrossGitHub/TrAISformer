@@ -69,6 +69,10 @@ if __name__ == "__main__":
 
     ## Data
     # ===============================
+    datapath = os.path.join(cf.datadir, cf.base_map)
+    print(f"Loading {datapath}...")
+    with open(datapath, "rb") as f:
+        map = pickle.load(f)
     moving_threshold = 0.05
     l_pkl_filenames = [cf.trainset_name, cf.validset_name, cf.testset_name]
     Data, aisdatasets, aisdls = {}, {}, {}
