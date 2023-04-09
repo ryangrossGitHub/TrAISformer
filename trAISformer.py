@@ -87,7 +87,7 @@ if __name__ == "__main__":
             except:
                 moving_idx = len(V["traj"]) - 1  # This track will be removed
             V["traj"] = V["traj"][moving_idx:, :]
-        Data[phase] = [x for x in l_pred_errors if not np.isnan(x["traj"]).any() and len(x["traj"]) > cf.min_seqlen]
+        Data[phase] = [x for x in l_pred_errors if not np.isnan(x["traj"]).any()]
         print(len(l_pred_errors), len(Data[phase]))
         print(f"Length: {len(Data[phase])}")
         print("Creating pytorch dataset...")
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     plt.plot([0, 3], [pred_errors[timestep], pred_errors[timestep]], "r")
     plt.text(3.12, pred_errors[timestep] - 0.5, "{:.4f}".format(pred_errors[timestep]), fontsize=10)
     plt.xlabel("Time (hours)")
-    plt.ylabel("Prediction errors (km)")
+    plt.ylabel("Prediction errors (miles)")
     plt.xlim([0, 12])
     plt.ylim([0, 20])
     # plt.ylim([0,pred_errors.max()+0.5])

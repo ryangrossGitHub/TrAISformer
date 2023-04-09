@@ -39,17 +39,17 @@ class Config():
     max_seqlen = 120
     min_seqlen = 36
 
-    dataset_name = "ct_dma"
+    dataset_name = "ais_downloads"
 
-    if dataset_name == "ct_dma":  # ==============================
+    if dataset_name == "ais_downloads":  # ==============================
 
         # When mode == "grad" or "pos_grad", sog and cog are actually dlat and
         # dlon
         lat_size = 250
         lon_size = 270
         sog_size = 30
-        cog_size = 72
-        mid_size = 999
+        cog_size = 360
+        type_size = 100
 
         # n_lat_embd = 256
         # n_lon_embd = 256
@@ -60,12 +60,12 @@ class Config():
         n_lon_embd = 8
         n_sog_embd = 4
         n_cog_embd = 4
-        n_mid_embd = 8
+        n_type_embd = 4
 
-        lat_min = 55.5
-        lat_max = 58.0
-        lon_min = 10.3
-        lon_max = 13
+        lat_min = 35.5
+        lat_max = 38.0
+        lon_min = -77.7
+        lon_max = -74.0
 
     # ===========================================================================
     # Model and sampling flags
@@ -88,9 +88,10 @@ class Config():
     # Data flags
     # ===================================================
     datadir = f"./data/{dataset_name}/"
-    trainset_name = f"{dataset_name}_train.pkl"
-    validset_name = f"{dataset_name}_valid.pkl"
-    testset_name = f"{dataset_name}_test.pkl"
+    base_map = "dma_coastline_polygons.pkl"
+    trainset_name = "train.pkl"
+    validset_name = "valid.pkl"
+    testset_name = "test.pkl"
 
     # model parameters
     # ===================================================
@@ -98,8 +99,8 @@ class Config():
     # n_layer = 8
     n_head = 1
     n_layer = 1
-    full_size = lat_size + lon_size + sog_size + cog_size + mid_size
-    n_embd = n_lat_embd + n_lon_embd + n_sog_embd + n_cog_embd + n_mid_embd
+    full_size = lat_size + lon_size + sog_size + cog_size + type_size
+    n_embd = n_lat_embd + n_lon_embd + n_sog_embd + n_cog_embd + n_type_embd
     # base GPT config, params common to all GPT versions
     embd_pdrop = 0.1
     resid_pdrop = 0.1
@@ -122,8 +123,8 @@ class Config():
     filename = f"{dataset_name}" \
                + f"-{mode}-{sample_mode}-{top_k}-{r_vicinity}" \
                + f"-blur-{blur}-{blur_learnable}-{blur_n}-{blur_loss_w}" \
-               + f"-data_size-{lat_size}-{lon_size}-{sog_size}-{cog_size}-{mid_size}" \
-               + f"-embd_size-{n_lat_embd}-{n_lon_embd}-{n_sog_embd}-{n_cog_embd}-{n_mid_embd}" \
+               + f"-data_size-{lat_size}-{lon_size}-{sog_size}-{cog_size}-{type_size}" \
+               + f"-embd_size-{n_lat_embd}-{n_lon_embd}-{n_sog_embd}-{n_cog_embd}-{n_type_embd}" \
                + f"-head-{n_head}-{n_layer}" \
                + f"-bs-{batch_size}" \
                + f"-lr-{learning_rate}" \

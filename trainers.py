@@ -67,8 +67,8 @@ def sample(model,
         # pluck the logits at the final step and scale by temperature
         logits = logits[:, -1, :] / temperature  # (batch_size, data_size)
 
-        lat_logits, lon_logits, sog_logits, cog_logits, mid_logits = \
-            torch.split(logits, (model.lat_size, model.lon_size, model.sog_size, model.cog_size, model.mid_size), dim=-1)
+        lat_logits, lon_logits, sog_logits, cog_logits, type_logits = \
+            torch.split(logits, (model.lat_size, model.lon_size, model.sog_size, model.cog_size, model.type_size), dim=-1)
 
         # optionally crop probabilities to only the top k options
         if sample_mode in ("pos_vicinity",):
@@ -82,14 +82,14 @@ def sample(model,
             lon_logits = utils.top_k_logits(lon_logits, top_k)
             sog_logits = utils.top_k_logits(sog_logits, top_k)
             cog_logits = utils.top_k_logits(cog_logits, top_k)
-            mid_logits = utils.top_k_logits(mid_logits, top_k)
+            type_logits = utils.top_k_logits(type_logits, top_k)
 
         # apply softmax to convert to probabilities
         lat_probs = F.softmax(lat_logits, dim=-1)
         lon_probs = F.softmax(lon_logits, dim=-1)
         sog_probs = F.softmax(sog_logits, dim=-1)
         cog_probs = F.softmax(cog_logits, dim=-1)
-        mid_probs = F.softmax(mid_logits, dim=-1)
+        type_probs = F.softmax(type_logits, dim=-1)
 
         # sample from the distribution or take the most likely
         if sample:
@@ -97,15 +97,15 @@ def sample(model,
             lon_ix = torch.multinomial(lon_probs, num_samples=1)
             sog_ix = torch.multinomial(sog_probs, num_samples=1)
             cog_ix = torch.multinomial(cog_probs, num_samples=1)
-            mid_ix = torch.multinomial(mid_probs, num_samples=1)
+            type_ix = torch.multinomial(type_probs, num_samples=1)
         else:
             _, lat_ix = torch.topk(lat_probs, k=1, dim=-1)
             _, lon_ix = torch.topk(lon_probs, k=1, dim=-1)
             _, sog_ix = torch.topk(sog_probs, k=1, dim=-1)
             _, cog_ix = torch.topk(cog_probs, k=1, dim=-1)
-            _, mid_ix = torch.topk(mid_probs, k=1, dim=-1)
+            _, type_ix = torch.topk(type_probs, k=1, dim=-1)
 
-        ix = torch.cat((lat_ix, lon_ix, sog_ix, cog_ix, mid_ix), dim=-1)
+        ix = torch.cat((lat_ix, lon_ix, sog_ix, cog_ix, type_ix), dim=-1)
         # convert to x (range: [0,1))
         x_sample = (ix.float() + d2inf_pred) / model.att_sizes
 
@@ -285,82 +285,89 @@ class Trainer:
             ## SAMPLE AND PLOT
             # ==========================================================================================
             # ==========================================================================================
-            raw_model = model.module if hasattr(self.model, "module") else model
-            seqs, masks, seqlens, mmsis, time_starts = next(iter(aisdls["test"]))
-            n_plots = 7
-            init_seqlen = INIT_SEQLEN
-            seqs_init = seqs[:n_plots, :init_seqlen, :].to(self.device)
-            preds = sample(raw_model,
-                           seqs_init,
-                           96 - init_seqlen,
-                           temperature=1.0,
-                           sample=True,
-                           sample_mode=self.config.sample_mode,
-                           r_vicinity=self.config.r_vicinity,
-                           top_k=self.config.top_k)
+            iterator = iter(aisdls["test"])
+            for i in range(10):
+                seqs, masks, seqlens, mmsis, time_starts = next(iterator)
+                raw_model = model.module if hasattr(self.model, "module") else model
+                n_plots = 7
+                init_seqlen = INIT_SEQLEN
+                seqs_init = seqs[:n_plots, :init_seqlen, :].to(self.device)
+                preds = sample(raw_model,
+                               seqs_init,
+                               96 - init_seqlen,
+                               temperature=1.0,
+                               sample=True,
+                               sample_mode=self.config.sample_mode,
+                               r_vicinity=self.config.r_vicinity,
+                               top_k=self.config.top_k)
 
-            img_path = os.path.join(self.savedir, f'epoch_{epoch + 1:03d}.jpg')
+                img_path = os.path.join(self.savedir, f'epoch_{epoch + 1:03d}_'+str(i)+'.jpg')
 
-            cf = Config()
-            # =====================================================================
-            LAT_MIN, LAT_MAX, LON_MIN, LON_MAX = cf.lat_min, cf.lat_max, cf.lon_min, cf.lon_max
+                cf = Config()
+                # =====================================================================
+                LAT_MIN, LAT_MAX, LON_MIN, LON_MAX = cf.lat_min, cf.lat_max, cf.lon_min, cf.lon_max
 
-            LAT_RANGE = LAT_MAX - LAT_MIN
-            LON_RANGE = LON_MAX - LON_MIN
-            SPEED_MAX = 30.0  # knots
-            DURATION_MAX = 24  # h
+                LAT_RANGE = LAT_MAX - LAT_MIN
+                LON_RANGE = LON_MAX - LON_MIN
+                SPEED_MAX = 30.0  # knots
+                DURATION_MAX = 24  # h
 
-            EPOCH = datetime(1970, 1, 1)
-            LAT, LON, SOG, COG, HEADING, ROT, NAV_STT, TIMESTAMP, MMSI = list(range(9))
+                EPOCH = datetime(1970, 1, 1)
+                LAT, LON, SOG, COG, HEADING, ROT, NAV_STT, TIMESTAMP, MMSI = list(range(9))
 
-            plt.figure(figsize=(9, 6), dpi=150)
-            # cmap = plt.cm.get_cmap('Blues')
-            preds_np = preds.detach().cpu().numpy()
-            inputs_np = seqs.detach().cpu().numpy()
+                plt.figure(figsize=(9, 6), dpi=150)
+                # cmap = plt.cm.get_cmap('Blues')
+                preds_np = preds.detach().cpu().numpy()
+                inputs_np = seqs.detach().cpu().numpy()
 
-            l_pkl_filenames = [cf.trainset_name]
-            Data, aisdatasets, aisdls = {}, {}, {}
-            for phase, filename in zip(("train"), l_pkl_filenames):
-                datapath = os.path.join(cf.datadir, filename)
-                print(f"Loading {datapath}...")
-                with open(datapath, "rb") as f:
-                    Data = pickle.load(f)
-                    Vs = Data
-                    FIG_DPI = 150
-                    cmap = plt.cm.get_cmap('Blues')
-                    N = len(Vs)
-                    for d_i in range(N):
-                        c = cmap(float(d_i) / (N - 1))
-                        tmp = Vs[d_i]
-                        v_lat = tmp['traj'][:, 0] * LAT_RANGE + LAT_MIN
-                        v_lon = tmp['traj'][:, 1] * LON_RANGE + LON_MIN
-                        plt.plot(v_lon, v_lat, color=c, linewidth=0.8)
+                l_pkl_filenames = [cf.trainset_name]
+                Data, aisdatasets, aisdls = {}, {}, {}
+                for phase, filename in zip(("train"), l_pkl_filenames):
+                    datapath = os.path.join(cf.datadir, filename)
+                    print(f"Loading {datapath}...")
+                    with open(datapath, "rb") as f:
+                        Data = pickle.load(f)
+                        Vs = Data
+                        FIG_DPI = 150
+                        cmap = plt.cm.get_cmap('Blues')
+                        N = len(Vs)
+                        for d_i in range(N):
+                            c = cmap(float(d_i) / (N - 1))
+                            tmp = Vs[d_i]
+                            v_lat = tmp['traj'][:, 0] * LAT_RANGE + LAT_MIN
+                            v_lon = tmp['traj'][:, 1] * LON_RANGE + LON_MIN
+                            plt.plot(v_lon, v_lat, color=c, linewidth=0.8)
 
-            coastline_filename = "./data/ct_dma/dma_coastline_polygons.pkl"
-            with open(coastline_filename, 'rb') as f:
-                l_coastline_poly = pickle.load(f)
-                for point in l_coastline_poly:
-                    poly = np.array(point)
-                    plt.plot(poly[:, 1], poly[:, 0], color="k", linewidth=0.8)
+                coastline_filename = "./data/ct_dma/dma_coastline_polygons.pkl"
+                # with open(coastline_filename, 'rb') as f:
+                #     l_coastline_poly = pickle.load(f)
+                #     for point in l_coastline_poly:
+                #         poly = np.array(point)
+                #         plt.plot(poly[:, 1], poly[:, 0], color="k", linewidth=0.8)
 
 
-            for idx in range(n_plots):
-                c = cmap(float(idx) / (n_plots))
-                try:
-                    seqlen = seqlens[idx].item()
-                except:
-                    continue
-                plt.plot(utils.scale_array(inputs_np[idx][:seqlen, 1], LON_MIN, LON_MAX),
-                         utils.scale_array(inputs_np[idx][:seqlen, 0], LAT_MIN, LAT_MAX), linestyle="-", color="r")
-                plt.plot(utils.scale_array(preds_np[idx][init_seqlen:, 1], LON_MIN, LON_MAX),
-                         utils.scale_array(preds_np[idx][init_seqlen:, 0], LAT_MIN, LAT_MAX), "--", markersize=4, color="g")
-            plt.xlim([LON_MIN, LON_MAX])
-            plt.ylim([LAT_MIN, LAT_MAX])
-            plt.xlabel("Longitude")
-            plt.ylabel("Latitude")
-            plt.tight_layout()
-            plt.savefig(img_path, dpi=150)
-            plt.close()
+                for idx in range(n_plots):
+                    c = cmap(float(idx) / (n_plots))
+                    try:
+                        seqlen = seqlens[idx].item()
+                    except:
+                        continue
+                    plt.plot(utils.scale_array(inputs_np[idx][:init_seqlen, 1], LON_MIN, LON_MAX),
+                             utils.scale_array(inputs_np[idx][:init_seqlen, 0], LAT_MIN, LAT_MAX), linestyle="solid",
+                             color="r")
+                    plt.plot(utils.scale_array(inputs_np[idx][:seqlen, 1], LON_MIN, LON_MAX),
+                             utils.scale_array(inputs_np[idx][:seqlen, 0], LAT_MIN, LAT_MAX), linestyle="dashed",
+                             color="r")
+                    plt.plot(utils.scale_array(preds_np[idx][init_seqlen:, 1], LON_MIN, LON_MAX),
+                             utils.scale_array(preds_np[idx][init_seqlen:, 0], LAT_MIN, LAT_MAX), linestyle="dotted",
+                             markersize=4, color="g")
+                plt.xlim([LON_MIN, LON_MAX])
+                plt.ylim([LAT_MIN, LAT_MAX])
+                plt.xlabel("Longitude")
+                plt.ylabel("Latitude")
+                plt.tight_layout()
+                plt.savefig(img_path, dpi=150)
+                plt.close()
 
         # Final state
         raw_model = self.model.module if hasattr(self.model, "module") else self.model

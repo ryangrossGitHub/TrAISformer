@@ -101,6 +101,13 @@ def top_k_nearest_idx(att_logits, att_idxs, r_vicinity):
 def scale_array(values, min, max):
     updated_list = []
     for value in values:
-        scaled_value = (((value - 0) * (max - min)) / (1 - 0)) + min
-        updated_list.append(scaled_value)
+        updated_list.append(scale_value(value, min, max))
     return np.array(updated_list)
+
+# 0 - 1 range up to orig number
+def scale_value(value, min, max):
+    return (((value - 0) * (max - min)) / (1 - 0)) + min
+
+# Orig number down to 0 - 1 range
+def nomalize_value(value, min, max):
+    return (value - min) / (max - min)
